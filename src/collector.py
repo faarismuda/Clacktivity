@@ -30,6 +30,7 @@ class EventCollector:
         self._raw_queue: queue.SimpleQueue[RawKeyEvent | None] = queue.SimpleQueue()
         self._pending_batch: list[dict[str, Any]] = []
         self._batch_lock = threading.Lock()
+        self._held_modifier_keys: dict[str, str] = {}
         self._active_modifiers: set[str] = set()
         self._is_paused = False
         self._subscribers: list[Callable[[dict[str, Any]], None]] = []
@@ -46,6 +47,7 @@ class EventCollector:
         """Set pause state and clear active modifiers when pausing."""
         self._is_paused = bool(paused)
         if self._is_paused:
+            self._held_modifier_keys.clear()
             self._active_modifiers.clear()
         self._notify_subscribers({"type": "status", "is_paused": self._is_paused})
         return self._is_paused
@@ -85,14 +87,17 @@ class EventCollector:
 
         if not raw.is_keydown:
             if key_info.modifier_group:
-                self._active_modifiers.discard(key_info.modifier_group)
+                self._held_modifier_keys.pop(key_info.key_code, None)
+                if key_info.modifier_group not in self._held_modifier_keys.values():
+                    self._active_modifiers.discard(key_info.modifier_group)
             return None
-
-        if key_info.modifier_group:
-            self._active_modifiers.add(key_info.modifier_group)
 
         if self._is_paused:
             return None
+
+        if key_info.modifier_group:
+            self._held_modifier_keys[key_info.key_code] = key_info.modifier_group
+            self._active_modifiers.add(key_info.modifier_group)
 
         dt = datetime.fromtimestamp(raw.timestamp)
         iso_time = dt.strftime("%Y-%m-%d %H:%M:%S.") + f"{int(dt.microsecond / 1000):03d}"

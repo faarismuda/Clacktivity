@@ -24,15 +24,28 @@ export class KeyboardHeatmap {
   setCounts(keyCounts, selectedKey = "") {
     this.keyCounts = keyCounts || {};
     this.selectedKey = selectedKey;
-    this.render();
+    if (this.keyElements.size === 0) this.render();
+    else this.refreshCountsAndStyles();
+  }
+
+  refreshCountsAndStyles() {
+    const counts = Object.values(this.keyCounts);
+    const maxCount = counts.length ? Math.max(...counts, 1) : 1;
+    for (const [code, entry] of this.keyElements.entries()) {
+      const cnt = this.keyCounts[code] || 0;
+      const tier = this.computeHeatTier(cnt, maxCount);
+      entry.btn.classList.remove("heat-tier-0", "heat-tier-1", "heat-tier-2", "heat-tier-3", "heat-tier-4", "heat-tier-5");
+      entry.btn.classList.add(`heat-tier-${tier}`);
+      entry.btn.classList.toggle("kb-key-selected", code === this.selectedKey);
+      entry.countEl.textContent = cnt > 0 ? this.formatCompact(cnt) : "";
+      entry.btn.title = `${entry.label} (${code}): ${cnt.toLocaleString()} presses`;
+    }
   }
 
   setSelectedKey(keyCode) {
     this.selectedKey = this.selectedKey === keyCode ? "" : keyCode;
     this.updateSelectionStyles();
-    if (this.onKeySelect) {
-      this.onKeySelect(this.selectedKey);
-    }
+    if (this.onKeySelect) this.onKeySelect(this.selectedKey);
   }
 
   computeHeatTier(count, maxCount) {
@@ -52,12 +65,8 @@ export class KeyboardHeatmap {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `kb-key heat-tier-${tier}`;
-    if (this.selectedKey === keyCode) {
-      btn.classList.add("kb-key-selected");
-    }
-    if (extraOpts.widthUnits) {
-      btn.style.setProperty("--u", String(extraOpts.widthUnits));
-    }
+    if (this.selectedKey === keyCode) btn.classList.add("kb-key-selected");
+    if (extraOpts.widthUnits) btn.style.setProperty("--u", String(extraOpts.widthUnits));
     if (extraOpts.gapBefore && extraOpts.gapBefore > 0) {
       btn.style.setProperty("--gap-before", String(extraOpts.gapBefore));
       btn.classList.add("kb-key-gapped");
@@ -162,17 +171,7 @@ export class KeyboardHeatmap {
   flashKey(keyCode, incrementCount = false) {
     if (incrementCount) {
       this.keyCounts[keyCode] = (this.keyCounts[keyCode] || 0) + 1;
-      const counts = Object.values(this.keyCounts);
-      const maxCount = counts.length ? Math.max(...counts, 1) : 1;
-
-      for (const [code, entry] of this.keyElements.entries()) {
-        const cnt = this.keyCounts[code] || 0;
-        const tier = this.computeHeatTier(cnt, maxCount);
-        entry.btn.classList.remove("heat-tier-0", "heat-tier-1", "heat-tier-2", "heat-tier-3", "heat-tier-4", "heat-tier-5");
-        entry.btn.classList.add(`heat-tier-${tier}`);
-        entry.countEl.textContent = cnt > 0 ? this.formatCompact(cnt) : "";
-        entry.btn.title = `${entry.label} (${code}): ${cnt.toLocaleString()} presses`;
-      }
+      this.refreshCountsAndStyles();
     }
 
     const target = this.keyElements.get(keyCode);

@@ -81,3 +81,15 @@ def test_peak_wpm_never_below_avg_wpm_across_spaced_bursts():
     assert wpm["avg_wpm"] > 50.0
     assert wpm["peak_wpm"] >= wpm["avg_wpm"]
 
+
+def test_wpm_metrics_short_sub_burst_has_zero_peak_when_avg_is_zero():
+    base_ts = 1731045600.0
+    events = [
+        {"timestamp": base_ts, "is_printable": 1},
+        {"timestamp": base_ts + 0.4, "is_printable": 1},
+    ]
+    wpm = compute_wpm_metrics(events)
+    assert wpm["avg_wpm"] == 0.0
+    assert wpm["peak_wpm"] == 0.0
+
+

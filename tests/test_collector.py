@@ -56,3 +56,31 @@ def test_window_tracker_returns_tuple():
     assert isinstance(app_name, str)
     assert len(app_name) > 0
     assert isinstance(title, str)
+
+
+def test_collector_overlapping_same_group_modifiers_and_paused_modifiers(tmp_path: Path):
+    db = Database(tmp_path / "collector_mods.db")
+    db.init_db()
+    collector = EventCollector(db=db, window_provider=lambda: ("Code.exe", "VS Code"))
+
+    # Hold LeftShift (0xA0), tap and release RightShift (0xA1), then press 'A' (0x41)
+    collector.handle_raw_event(RawKeyEvent(1731045600.1, 0xA0, 0, True))
+    collector.handle_raw_event(RawKeyEvent(1731045600.2, 0xA1, 0, True))
+    collector.handle_raw_event(RawKeyEvent(1731045600.3, 0xA1, 0, False))
+    ev_a = collector.handle_raw_event(RawKeyEvent(1731045600.4, 0x41, 0, True))
+    assert ev_a is not None
+    assert ev_a["modifiers"] == "Shift"
+    assert ev_a["combo_label"] == "Shift+A"
+
+    # Release LeftShift
+    collector.handle_raw_event(RawKeyEvent(1731045600.5, 0xA0, 0, False))
+
+    # Pause recording, press LeftControl while paused, resume, then press 'C'
+    collector.set_paused(True)
+    collector.handle_raw_event(RawKeyEvent(1731045600.6, 0xA2, 0, True))
+    collector.set_paused(False)
+    ev_c = collector.handle_raw_event(RawKeyEvent(1731045600.7, 0x43, 0, True))
+    assert ev_c is not None
+    assert ev_c["modifiers"] == ""
+    assert ev_c["combo_label"] == ""
+

@@ -124,10 +124,10 @@ class Database:
         if search_query:
             like_val = f"%{search_query}%"
             clauses.append(
-                "(key_label LIKE ? OR key_code LIKE ? OR combo_label LIKE ? "
-                "OR app_name LIKE ? OR window_title LIKE ?)"
+                "(key_label LIKE ? OR key_code LIKE ? OR modifiers LIKE ? "
+                "OR combo_label LIKE ? OR app_name LIKE ? OR window_title LIKE ?)"
             )
-            params.extend([like_val] * 5)
+            params.extend([like_val] * 6)
 
         where_sql = " AND ".join(clauses)
         with self._connect() as conn:

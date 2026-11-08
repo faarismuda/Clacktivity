@@ -55,10 +55,15 @@ def compute_wpm_metrics(events: list[dict[str, Any]]) -> dict[str, float]:
         if last_burst_wpm > max_burst_wpm:
             max_burst_wpm = last_burst_wpm
 
-    avg_wpm = 0.0
-    if total_qualifying_sec > 0:
-        words = total_qualifying_chars / CHARS_PER_WORD
-        avg_wpm = (words / total_qualifying_sec) * 60.0
+    if total_qualifying_sec <= 0:
+        return {
+            "active_seconds": round(total_active_sec, 1),
+            "avg_wpm": 0.0,
+            "peak_wpm": 0.0,
+        }
+
+    words = total_qualifying_chars / CHARS_PER_WORD
+    avg_wpm = (words / total_qualifying_sec) * 60.0
 
     # Rolling window peak WPM (60-second window, or scaled burst if < 60s total span)
     left = 0

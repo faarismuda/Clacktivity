@@ -101,6 +101,7 @@ export function renderHorizontalEventsStream(containerEl, events, order = "asc",
   containerEl.innerHTML = ordered
     .map((ev) => buildStreamEventChipHtml(ev, false, mode))
     .join("");
+  containerEl.scrollTop = order === "asc" ? containerEl.scrollHeight : 0;
 }
 
 export function insertLiveStreamChip(containerEl, ev, order = "asc", maxItems = 250, mode = "raw") {

@@ -147,3 +147,24 @@ def test_dashboard_ux_improvements(tmp_path: Path):
     assert "scheduleLiveAnalyticsRefresh" in app_js
 
 
+def test_visual_ui_and_filter_reset_fixes(tmp_path: Path):
+    db = Database(tmp_path / "visual_fixes.db")
+    db.init_db()
+    collector = EventCollector(db=db, window_provider=lambda: ("Code.exe", "editor.py"))
+    app = create_app(db=db, collector=collector)
+    client = TestClient(app)
+
+    css = client.get("/static/css/styles.css").text
+    assert "color-scheme: dark" in css
+    assert "white-space: nowrap" in css
+    assert ".kb-numpad-grid .kb-legend" in css
+
+    app_js = client.get("/static/js/app.js").text
+    assert '$("key-table-search").value = ""' in app_js
+    assert "of selected day" in app_js
+
+    viewer_js = client.get("/static/js/log_viewer.js").text
+    assert 'containerEl.scrollTop = order === "asc" ? containerEl.scrollHeight : 0' in viewer_js
+
+
+

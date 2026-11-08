@@ -95,10 +95,14 @@ function bindEvents() {
   });
 
   $("btn-clear-filters").addEventListener("click", () => {
+    clearTimeout(searchDebounce);
+    clearTimeout(streamSearchDebounce);
     state.selectedKey = "";
     state.selectedApp = "";
+    state.keySearch = "";
     state.logSearch = "";
     state.streamSearch = "";
+    $("key-table-search").value = "";
     $("log-search").value = "";
     $("stream-search").value = "";
     state.logOffset = 0;
@@ -241,7 +245,9 @@ function renderSummaryKpis(s) {
   $("kpi-top-key").textContent = s.top_key?.key_label || "-";
   $("kpi-top-key-count").textContent = `${(s.top_key?.count || 0).toLocaleString()} presses`;
   $("kpi-top-app").textContent = s.top_app?.app_name || "-";
-  $("kpi-top-app-share").textContent = `${s.top_app?.percentage || 0}% of today`;
+  $("kpi-top-app").title = s.top_app?.app_name || "";
+  const dayLabel = state.selectedDate && state.today && state.selectedDate !== state.today ? "of selected day" : "of today";
+  $("kpi-top-app-share").textContent = `${s.top_app?.percentage || 0}% ${dayLabel}`;
 }
 
 async function loadRawEvents() {

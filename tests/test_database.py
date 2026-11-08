@@ -77,3 +77,27 @@ def test_paginated_events_filters_by_combo_label(tmp_path: Path):
     assert res["total"] == 1
     assert res["items"][0]["combo_label"] == "Ctrl+C"
 
+
+def test_paginated_events_search_matches_modifiers_column(tmp_path: Path):
+    db = Database(tmp_path / "mod_search.db")
+    db.init_db()
+    db.insert_events_batch([
+        {
+            "timestamp": 1731045600.0,
+            "iso_time": "2026-11-08 10:00:00.000",
+            "date_str": "2026-11-08",
+            "hour": 10,
+            "vk_code": 0xA2,
+            "key_code": "LeftControl",
+            "key_label": "LCtrl",
+            "modifiers": "Shift+Win",
+            "combo_label": "",
+            "is_printable": 0,
+            "app_name": "Code.exe",
+            "window_title": "Editor",
+        }
+    ])
+    res = db.get_paginated_events("2026-11-08", search_query="Shift+Win")
+    assert res["total"] == 1
+
+
