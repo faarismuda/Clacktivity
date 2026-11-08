@@ -88,3 +88,76 @@ function buildRawEventRowHtml(ev, isLive = false) {
     </tr>
   `;
 }
+
+export function renderHorizontalEventsStream(containerEl, events, order = "asc", mode = "raw") {
+  if (!containerEl) return;
+  const filtered = (events || []).filter((ev) => !(mode === "clean" && !ev.combo_label && ev.modifiers));
+  if (filtered.length === 0) {
+    containerEl.innerHTML = `<div class="empty-cell" style="width:100%;">No raw press events match the current filter.</div>`;
+    return;
+  }
+
+  const ordered = order === "asc" ? [...filtered].reverse() : [...filtered];
+  containerEl.innerHTML = ordered
+    .map((ev) => buildStreamEventChipHtml(ev, false, mode))
+    .join("");
+}
+
+export function insertLiveStreamChip(containerEl, ev, order = "asc", maxItems = 250, mode = "raw") {
+  if (!containerEl) return;
+  if (mode === "clean" && !ev.combo_label && ev.modifiers) return;
+  const emptyCell = containerEl.querySelector(".empty-cell");
+  if (emptyCell) {
+    containerEl.innerHTML = "";
+  }
+  const temp = document.createElement("div");
+  temp.innerHTML = buildStreamEventChipHtml(ev, true, mode);
+  const nodes = Array.from(temp.children);
+  if (nodes.length === 0) return;
+  const newChip = nodes[0];
+  setTimeout(() => newChip.classList.remove("stream-chip-live"), 900);
+
+  if (order === "asc") {
+    nodes.forEach((n) => containerEl.appendChild(n));
+    while (containerEl.querySelectorAll(".stream-chip").length > maxItems) {
+      const first = containerEl.firstElementChild;
+      if (!first) break;
+      containerEl.removeChild(first);
+      if (containerEl.firstElementChild?.classList.contains("stream-line-break")) {
+        containerEl.removeChild(containerEl.firstElementChild);
+      }
+    }
+    containerEl.scrollTop = containerEl.scrollHeight;
+  } else {
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      containerEl.insertBefore(nodes[i], containerEl.firstChild);
+    }
+    while (containerEl.querySelectorAll(".stream-chip").length > maxItems) {
+      const last = containerEl.lastElementChild;
+      if (!last) break;
+      containerEl.removeChild(last);
+    }
+  }
+}
+
+function buildStreamEventChipHtml(ev, isLive = false, mode = "raw") {
+  const timePart = String(ev.iso_time || "").split(" ")[1] || ev.iso_time || "";
+  const liveClass = isLive ? " stream-chip-live" : "";
+  const comboInfo = ev.combo_label
+    ? ` | Combo: ${ev.combo_label}`
+    : ev.modifiers
+      ? ` | Mod: ${ev.modifiers}`
+      : "";
+  const tooltip = `${timePart} | Key: ${ev.key_label} (${ev.key_code})${comboInfo} | App: ${ev.app_name || "Unknown"} | Window: ${ev.window_title || "-"}`;
+  const lineBreak = mode === "clean" && (ev.key_code === "Enter" || ev.key_code === "NumpadEnter")
+    ? `<span class="stream-line-break"></span>`
+    : "";
+
+  if (ev.combo_label) {
+    return `<span class="combo-badge stream-chip${liveClass}" title="${escapeHtml(tooltip)}">${escapeHtml(ev.combo_label)}</span>${lineBreak}`;
+  }
+  if (ev.modifiers) {
+    return `<span class="mod-pill stream-chip${liveClass}" title="${escapeHtml(tooltip)}">${escapeHtml(ev.key_label)}</span>${lineBreak}`;
+  }
+  return `<span class="key-badge stream-chip${liveClass}" title="${escapeHtml(tooltip)}">${escapeHtml(ev.key_label)}</span>${lineBreak}`;
+}

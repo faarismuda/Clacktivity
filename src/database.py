@@ -116,8 +116,8 @@ class Database:
         params: list[Any] = [date_str]
 
         if key_filter:
-            clauses.append("(key_code = ? OR key_label = ?)")
-            params.extend([key_filter, key_filter])
+            clauses.append("(key_code = ? OR key_label = ? OR combo_label = ?)")
+            params.extend([key_filter, key_filter, key_filter])
         if app_filter:
             clauses.append("app_name = ?")
             params.append(app_filter)

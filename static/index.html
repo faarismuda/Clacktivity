@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Windows Keyboard Analytics</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='2' y='5' width='20' height='14' rx='2' fill='%231e2028' stroke='%23e5a00d' stroke-width='2'/><path fill='%23e5a00d' d='M6 9h2v2H6zm4 0h2v2h-2zm4 0h2v2h-2zm4 0h2v2h-2zM6 13h2v2H6zm4 0h6v2h-6zm8 0h2v2h-2z'/></svg>" />
   <link rel="stylesheet" href="/static/css/styles.css" />
 </head>
 <body>
@@ -102,7 +103,7 @@
       <div class="panel">
         <div class="panel-head">
           <h2 class="panel-title">Top Modifier Shortcuts</h2>
-          <span class="panel-sub">Ctrl / Alt / Shift / Win Combos</span>
+          <span class="panel-sub">Click combo to filter</span>
         </div>
         <div id="top-shortcuts-list" class="rank-list"></div>
       </div>
@@ -168,6 +169,30 @@
           </table>
         </div>
       </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Horizontal Key Stream</h2>
+          <p class="panel-sub">Sequential keycap flow (1-to-1 raw events)</p>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;">
+          <div class="seg-group" role="group" aria-label="Stream Display Mode">
+            <button type="button" class="seg-btn seg-active" data-stream-mode="raw">1:1 Raw</button>
+            <button type="button" class="seg-btn" data-stream-mode="clean">Readable</button>
+          </div>
+          <div class="seg-group" role="group" aria-label="Stream Order">
+            <button type="button" class="seg-btn seg-active" data-stream-order="asc">Old &rarr; New</button>
+            <button type="button" class="seg-btn" data-stream-order="desc">New &rarr; Old</button>
+          </div>
+          <input type="search" id="stream-search" class="input-ctrl" placeholder="Filter key, combo, app, window..." />
+          <button type="button" id="btn-stream-prev" class="btn">Prev</button>
+          <span id="stream-page-info" class="mono-sm">0-0 of 0</span>
+          <button type="button" id="btn-stream-next" class="btn">Next</button>
+        </div>
+      </div>
+      <div id="horizontal-events-stream" class="key-stream-box"></div>
     </section>
   </main>
 

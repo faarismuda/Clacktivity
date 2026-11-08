@@ -57,3 +57,93 @@ def test_api_endpoints(tmp_path: Path):
     js_res = client.get("/static/js/app.js")
     assert js_res.status_code == 200
     assert "KeyboardHeatmap" in js_res.text
+
+
+def test_horizontal_key_stream_markup_and_styles(tmp_path: Path):
+    db = Database(tmp_path / "stream_ui.db")
+    db.init_db()
+    collector = EventCollector(db=db, window_provider=lambda: ("Code.exe", "VS Code"))
+    app = create_app(db=db, collector=collector)
+    client = TestClient(app)
+
+    index_res = client.get("/")
+    assert index_res.status_code == 200
+    html = index_res.text
+    assert "Horizontal Key Stream" in html
+    assert 'id="horizontal-events-stream"' in html
+    assert 'id="stream-search"' in html
+    assert 'id="btn-stream-prev"' in html
+    assert 'id="btn-stream-next"' in html
+    assert 'id="stream-page-info"' in html
+    assert 'data-stream-order="asc"' in html
+    assert 'data-stream-order="desc"' in html
+
+    css_res = client.get("/static/css/styles.css")
+    assert css_res.status_code == 200
+    assert ".key-stream-box" in css_res.text
+    assert ".stream-chip" in css_res.text
+    assert "#stream-search" in css_res.text
+
+
+def test_horizontal_key_stream_js_and_pagination(tmp_path: Path):
+    db = Database(tmp_path / "stream_js.db")
+    db.init_db()
+    collector = EventCollector(db=db, window_provider=lambda: ("Code.exe", "editor.py"))
+    collector.handle_raw_event(RawKeyEvent(1731045600.1, 0x48, 0, True))  # H
+    collector.handle_raw_event(RawKeyEvent(1731045600.2, 0x49, 0, True))  # I
+    collector.flush()
+
+    app = create_app(db=db, collector=collector)
+    client = TestClient(app)
+
+    viewer_res = client.get("/static/js/log_viewer.js")
+    assert viewer_res.status_code == 200
+    assert "export function renderHorizontalEventsStream" in viewer_res.text
+    assert "export function insertLiveStreamChip" in viewer_res.text
+    assert "buildStreamEventChipHtml" in viewer_res.text
+    assert "${escapeHtml(ev.modifiers)}+${escapeHtml(ev.key_label)}" not in viewer_res.text
+
+    app_js_res = client.get("/static/js/app.js")
+    assert app_js_res.status_code == 200
+    assert "renderHorizontalEventsStream" in app_js_res.text
+    assert "insertLiveStreamChip" in app_js_res.text
+    assert "loadStreamEvents" in app_js_res.text
+    assert "streamLimit: 250" in app_js_res.text
+
+    events_res = client.get("/api/events?date=2024-11-08&limit=250&offset=0")
+    assert events_res.status_code == 200
+    payload = events_res.json()
+    assert payload["total"] == 2
+    assert payload["limit"] == 250
+    assert [item["key_label"] for item in payload["items"]] == ["I", "H"]
+
+
+def test_dashboard_ux_improvements(tmp_path: Path):
+    db = Database(tmp_path / "ux.db")
+    db.init_db()
+    collector = EventCollector(db=db, window_provider=lambda: ("Code.exe", "editor.py"))
+    app = create_app(db=db, collector=collector)
+    client = TestClient(app)
+
+    html = client.get("/").text
+    assert 'rel="icon"' in html
+    assert 'data-stream-mode="raw"' in html
+    assert 'data-stream-mode="clean"' in html
+
+    css = client.get("/static/css/styles.css").text
+    assert ".btn:disabled" in css
+    assert ".stream-line-break" in css
+    assert ".data-tr[data-key-code]:hover" in css
+
+    charts_js = client.get("/static/js/charts.js").text
+    assert "onShortcutClick" in charts_js
+
+    viewer_js = client.get("/static/js/log_viewer.js").text
+    assert "stream-line-break" in viewer_js
+
+    app_js = client.get("/static/js/app.js").text
+    assert "renderLogPageInfo" in app_js
+    assert "streamMode" in app_js
+    assert "scheduleLiveAnalyticsRefresh" in app_js
+
+

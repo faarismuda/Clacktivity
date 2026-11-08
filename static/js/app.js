@@ -3,16 +3,10 @@
  */
 
 import { KeyboardHeatmap } from "./heatmap.js";
+import { renderAppsBreakdown, renderHourlyChart, renderShortcutsList, renderTopKeysList } from "./charts.js";
 import {
-  renderAppsBreakdown,
-  renderHourlyChart,
-  renderShortcutsList,
-  renderTopKeysList,
-} from "./charts.js";
-import {
-  prependLiveEventRow,
-  renderDailyKeysTable,
-  renderRawEventsTable,
+  insertLiveStreamChip, prependLiveEventRow, renderDailyKeysTable,
+  renderHorizontalEventsStream, renderRawEventsTable,
 } from "./log_viewer.js";
 
 const state = {
@@ -27,11 +21,20 @@ const state = {
   logOffset: 0,
   logLimit: 100,
   logTotal: 0,
+  streamSearch: "",
+  streamOffset: 0,
+  streamLimit: 250,
+  streamTotal: 0,
+  streamMode: "raw",
+  streamOrder: "asc",
+  streamItems: [],
   dailyReport: null,
 };
 
 let heatmap = null;
 let searchDebounce = null;
+let streamSearchDebounce = null;
+let liveAnalyticsTimer = null;
 const $ = (id) => document.getElementById(id);
 
 function formatDuration(seconds) {
@@ -45,8 +48,10 @@ async function initDashboard() {
   heatmap = new KeyboardHeatmap($("heatmap-container"), (keyCode) => {
     state.selectedKey = keyCode;
     state.logOffset = 0;
+    state.streamOffset = 0;
     refreshSelectionViews();
     loadRawEvents();
+    loadStreamEvents();
   });
   bindEvents();
   await loadStatusAndInitialData();
@@ -64,7 +69,11 @@ function bindEvents() {
 
   $("date-picker").addEventListener("change", (e) => e.target.value && selectDate(e.target.value));
   $("btn-today").addEventListener("click", () => state.today && selectDate(state.today));
-  $("btn-refresh").addEventListener("click", () => { loadDailyAnalytics(); loadRawEvents(); });
+  $("btn-refresh").addEventListener("click", () => {
+    loadDailyAnalytics();
+    loadRawEvents();
+    loadStreamEvents();
+  });
 
   $("btn-toggle-pause").addEventListener("click", async () => {
     const res = await fetch("/api/status/toggle", { method: "POST" });
@@ -89,11 +98,15 @@ function bindEvents() {
     state.selectedKey = "";
     state.selectedApp = "";
     state.logSearch = "";
+    state.streamSearch = "";
     $("log-search").value = "";
+    $("stream-search").value = "";
     state.logOffset = 0;
+    state.streamOffset = 0;
     heatmap.setCounts(state.dailyReport?.key_counts || {}, "");
     refreshSelectionViews();
     loadRawEvents();
+    loadStreamEvents();
   });
 
   $("btn-prev-page").addEventListener("click", () => {
@@ -101,6 +114,38 @@ function bindEvents() {
   });
   $("btn-next-page").addEventListener("click", () => {
     if (state.logOffset + state.logLimit < state.logTotal) { state.logOffset += state.logLimit; loadRawEvents(); }
+  });
+
+  document.querySelectorAll("[data-stream-mode]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("[data-stream-mode]").forEach((b) => b.classList.remove("seg-active"));
+      btn.classList.add("seg-active");
+      state.streamMode = btn.dataset.streamMode;
+      renderHorizontalEventsStream($("horizontal-events-stream"), state.streamItems, state.streamOrder, state.streamMode);
+    });
+  });
+
+  document.querySelectorAll("[data-stream-order]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("[data-stream-order]").forEach((b) => b.classList.remove("seg-active"));
+      btn.classList.add("seg-active");
+      state.streamOrder = btn.dataset.streamOrder;
+      renderHorizontalEventsStream($("horizontal-events-stream"), state.streamItems, state.streamOrder, state.streamMode);
+    });
+  });
+
+  $("stream-search").addEventListener("input", (e) => {
+    state.streamSearch = e.target.value;
+    state.streamOffset = 0;
+    clearTimeout(streamSearchDebounce);
+    streamSearchDebounce = setTimeout(loadStreamEvents, 200);
+  });
+
+  $("btn-stream-prev").addEventListener("click", () => {
+    if (state.streamOffset >= state.streamLimit) { state.streamOffset -= state.streamLimit; loadStreamEvents(); }
+  });
+  $("btn-stream-next").addEventListener("click", () => {
+    if (state.streamOffset + state.streamLimit < state.streamTotal) { state.streamOffset += state.streamLimit; loadStreamEvents(); }
   });
 
   $("btn-export-csv").addEventListener("click", () => triggerExport("csv", "raw"));
@@ -121,16 +166,18 @@ async function loadStatusAndInitialData() {
   updatePauseBadge(data.is_paused);
   $("date-picker").value = state.selectedDate;
   renderDateHistoryPills();
-  await Promise.all([loadDailyAnalytics(), loadRawEvents()]);
+  await Promise.all([loadDailyAnalytics(), loadRawEvents(), loadStreamEvents()]);
 }
 
 function selectDate(dateStr) {
   state.selectedDate = dateStr;
   state.logOffset = 0;
+  state.streamOffset = 0;
   $("date-picker").value = dateStr;
   renderDateHistoryPills();
   loadDailyAnalytics();
   loadRawEvents();
+  loadStreamEvents();
 }
 
 function renderDateHistoryPills() {
@@ -158,22 +205,26 @@ async function loadDailyAnalytics() {
 function handleKeyFilterToggle(keyCode) {
   state.selectedKey = state.selectedKey === keyCode ? "" : keyCode;
   state.logOffset = 0;
+  state.streamOffset = 0;
   heatmap.setCounts(state.dailyReport?.key_counts || {}, state.selectedKey);
   refreshSelectionViews();
   loadRawEvents();
+  loadStreamEvents();
 }
 
 function handleAppFilterToggle(appName) {
   state.selectedApp = state.selectedApp === appName ? "" : appName;
   state.logOffset = 0;
+  state.streamOffset = 0;
   refreshSelectionViews();
   loadRawEvents();
+  loadStreamEvents();
 }
 
 function refreshSelectionViews() {
   if (!state.dailyReport) return;
   renderTopKeysList($("top-keys-list"), state.dailyReport.top_keys, handleKeyFilterToggle, state.selectedKey);
-  renderShortcutsList($("top-shortcuts-list"), state.dailyReport.top_shortcuts);
+  renderShortcutsList($("top-shortcuts-list"), state.dailyReport.top_shortcuts, handleKeyFilterToggle, state.selectedKey);
   renderAppsBreakdown($("apps-list"), state.dailyReport.apps, handleAppFilterToggle, state.selectedApp);
   renderDailyKeysTable($("daily-keys-tbody"), state.dailyReport.all_keys, handleKeyFilterToggle, state.selectedKey, state.keySearch);
   const chips = [state.selectedKey && `Key: ${state.selectedKey}`, state.selectedApp && `App: ${state.selectedApp}`].filter(Boolean);
@@ -205,9 +256,44 @@ async function loadRawEvents() {
   const data = await (await fetch(`/api/events?${params.toString()}`)).json();
   state.logTotal = data.total || 0;
   renderRawEventsTable($("raw-events-tbody"), data.items);
+  renderLogPageInfo();
+}
+
+function renderLogPageInfo() {
   const start = state.logTotal === 0 ? 0 : state.logOffset + 1;
   const end = Math.min(state.logOffset + state.logLimit, state.logTotal);
   $("log-page-info").textContent = `${start}-${end} of ${state.logTotal.toLocaleString()}`;
+  $("btn-prev-page").disabled = state.logOffset === 0;
+  $("btn-next-page").disabled = state.logOffset + state.logLimit >= state.logTotal;
+}
+
+async function loadStreamEvents() {
+  const params = new URLSearchParams({
+    date: state.selectedDate,
+    limit: String(state.streamLimit),
+    offset: String(state.streamOffset),
+    key: state.selectedKey,
+    app: state.selectedApp,
+    search: state.streamSearch,
+  });
+  const data = await (await fetch(`/api/events?${params.toString()}`)).json();
+  state.streamTotal = data.total || 0;
+  state.streamItems = data.items || [];
+  renderHorizontalEventsStream($("horizontal-events-stream"), state.streamItems, state.streamOrder, state.streamMode);
+  renderStreamPageInfo();
+}
+
+function renderStreamPageInfo() {
+  const start = state.streamTotal === 0 ? 0 : state.streamOffset + 1;
+  const end = Math.min(state.streamOffset + state.streamLimit, state.streamTotal);
+  $("stream-page-info").textContent = `${start}-${end} of ${state.streamTotal.toLocaleString()}`;
+  $("btn-stream-prev").disabled = state.streamOffset === 0;
+  $("btn-stream-next").disabled = state.streamOffset + state.streamLimit >= state.streamTotal;
+}
+
+function scheduleLiveAnalyticsRefresh() {
+  clearTimeout(liveAnalyticsTimer);
+  liveAnalyticsTimer = setTimeout(loadDailyAnalytics, 2500);
 }
 
 function updatePauseBadge(isPaused) {
@@ -233,7 +319,15 @@ function connectWebSocket() {
         if (!state.selectedKey && !state.selectedApp && !state.logSearch && state.logOffset === 0) {
           prependLiveEventRow($("raw-events-tbody"), ev);
           state.logTotal += 1;
+          renderLogPageInfo();
         }
+        if (!state.selectedKey && !state.selectedApp && !state.streamSearch && state.streamOffset === 0) {
+          state.streamItems = [ev, ...state.streamItems].slice(0, state.streamLimit);
+          state.streamTotal += 1;
+          insertLiveStreamChip($("horizontal-events-stream"), ev, state.streamOrder, state.streamLimit, state.streamMode);
+          renderStreamPageInfo();
+        }
+        scheduleLiveAnalyticsRefresh();
       }
     }
   };

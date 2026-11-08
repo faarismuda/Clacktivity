@@ -65,3 +65,19 @@ def test_exporter_csv_and_json():
     assert "KeyA" in json_body
     assert jmime == "application/json"
     assert jfname.endswith(".json")
+
+
+def test_peak_wpm_never_below_avg_wpm_across_spaced_bursts():
+    base_ts = 1731045600.0
+    events = []
+    # Burst 1: 30 printable chars in 6 seconds (6 words / 0.1 min = 60 WPM)
+    for i in range(30):
+        events.append({"timestamp": base_ts + i * 0.2, "is_printable": 1})
+    # Idle pause of 120 seconds, then Burst 2: 20 printable chars in 5 seconds (4 words / (5/60) min = 48 WPM)
+    for i in range(20):
+        events.append({"timestamp": base_ts + 120.0 + i * 0.25, "is_printable": 1})
+
+    wpm = compute_wpm_metrics(events)
+    assert wpm["avg_wpm"] > 50.0
+    assert wpm["peak_wpm"] >= wpm["avg_wpm"]
+

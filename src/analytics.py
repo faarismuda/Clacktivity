@@ -18,9 +18,9 @@ def compute_wpm_metrics(events: list[dict[str, Any]]) -> dict[str, float]:
 
     printable_ts.sort()
     total_active_sec = 0.0
-    burst_chars = 0
     total_qualifying_chars = 0
     total_qualifying_sec = 0.0
+    max_burst_wpm = 0.0
 
     burst_start = printable_ts[0]
     prev_ts = printable_ts[0]
@@ -38,6 +38,9 @@ def compute_wpm_metrics(events: list[dict[str, Any]]) -> dict[str, float]:
             if duration >= MIN_BURST_DURATION_SEC:
                 total_qualifying_sec += duration
                 total_qualifying_chars += burst_count
+                burst_wpm = ((burst_count / CHARS_PER_WORD) / duration) * 60.0
+                if burst_wpm > max_burst_wpm:
+                    max_burst_wpm = burst_wpm
             burst_start = ts
             prev_ts = ts
             burst_count = 1
@@ -48,6 +51,9 @@ def compute_wpm_metrics(events: list[dict[str, Any]]) -> dict[str, float]:
     if last_duration >= MIN_BURST_DURATION_SEC:
         total_qualifying_sec += last_duration
         total_qualifying_chars += burst_count
+        last_burst_wpm = ((burst_count / CHARS_PER_WORD) / last_duration) * 60.0
+        if last_burst_wpm > max_burst_wpm:
+            max_burst_wpm = last_burst_wpm
 
     avg_wpm = 0.0
     if total_qualifying_sec > 0:
@@ -66,7 +72,8 @@ def compute_wpm_metrics(events: list[dict[str, Any]]) -> dict[str, float]:
 
     total_span = max(printable_ts[-1] - printable_ts[0], 1.0)
     effective_window_sec = min(60.0, max(total_span, MIN_BURST_DURATION_SEC))
-    peak_wpm = ((max_in_60s / CHARS_PER_WORD) / effective_window_sec) * 60.0
+    rolling_peak_wpm = ((max_in_60s / CHARS_PER_WORD) / effective_window_sec) * 60.0
+    peak_wpm = max(rolling_peak_wpm, max_burst_wpm, avg_wpm)
 
     return {
         "active_seconds": round(total_active_sec, 1),

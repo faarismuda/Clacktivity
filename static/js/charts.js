@@ -63,7 +63,7 @@ export function renderTopKeysList(containerEl, topKeys, onKeyClick, selectedKey 
   }
 }
 
-export function renderShortcutsList(containerEl, shortcuts) {
+export function renderShortcutsList(containerEl, shortcuts, onShortcutClick, selectedKey = "") {
   if (!containerEl) return;
   if (!shortcuts || shortcuts.length === 0) {
     containerEl.innerHTML = `<p class="empty-note">No modifier shortcuts recorded on this date.</p>`;
@@ -74,8 +74,10 @@ export function renderShortcutsList(containerEl, shortcuts) {
   containerEl.innerHTML = "";
 
   for (const item of shortcuts.slice(0, 10)) {
-    const row = document.createElement("div");
-    row.className = "rank-row rank-row-static";
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = `rank-row ${selectedKey === item.combo ? "rank-row-active" : ""}`;
+    row.addEventListener("click", () => onShortcutClick && onShortcutClick(item.combo));
     const barPct = Math.round((item.count / maxCount) * 100);
     row.innerHTML = `
       <div class="rank-row-top">
