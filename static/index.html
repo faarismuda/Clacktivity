@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Windows Keyboard Analytics</title>
+  <link rel="stylesheet" href="/static/css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-group">
+      <h1 class="brand-title">Keyboard Analytics</h1>
+      <div class="status-badge">
+        <span id="status-dot" class="status-dot status-live"></span>
+        <span id="status-text">Recording Live</span>
+      </div>
+    </div>
+
+    <div class="toolbar-controls">
+      <input type="date" id="date-picker" class="input-ctrl" aria-label="Select Date" />
+      <button type="button" id="btn-today" class="btn">Today</button>
+      <button type="button" id="btn-refresh" class="btn">Refresh</button>
+      <button type="button" id="btn-toggle-pause" class="btn">Pause Recording</button>
+      <button type="button" id="btn-export-csv" class="btn">Export Raw CSV</button>
+      <button type="button" id="btn-export-summary" class="btn">Export Daily Summary CSV</button>
+      <button type="button" id="btn-export-json" class="btn">Export JSON</button>
+    </div>
+  </header>
+
+  <main class="page-wrap">
+    <section class="date-bar">
+      <div id="date-pills" class="date-pills"></div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span id="active-filters-label" class="panel-sub">Showing all events for selected date</span>
+        <button type="button" id="btn-clear-filters" class="btn">Reset Filters</button>
+      </div>
+    </section>
+
+    <section class="kpi-strip">
+      <div class="kpi-box">
+        <div class="kpi-label">Total Keystrokes</div>
+        <div id="kpi-total" class="kpi-val">0</div>
+        <div id="kpi-unique" class="kpi-sub">0 unique keys</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-label">Typing Speed (Active)</div>
+        <div id="kpi-wpm" class="kpi-val">0 WPM</div>
+        <div id="kpi-peak-wpm" class="kpi-sub">Peak 0 WPM</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-label">Active Typing Time</div>
+        <div id="kpi-active-time" class="kpi-val">0s</div>
+        <div id="kpi-peak-hour" class="kpi-sub">Peak hour 00:00</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-label">Most Pressed Key</div>
+        <div id="kpi-top-key" class="kpi-val">-</div>
+        <div id="kpi-top-key-count" class="kpi-sub">0 presses</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-label">Top Application</div>
+        <div id="kpi-top-app" class="kpi-val">-</div>
+        <div id="kpi-top-app-share" class="kpi-sub">0% of today</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Interactive Keyboard Heatmap</h2>
+          <p class="panel-sub">Keys flash live as you type. Click any keycap to filter logs by that key.</p>
+        </div>
+        <div class="seg-group" role="group" aria-label="Keyboard Layout Size">
+          <button type="button" class="seg-btn seg-active" data-layout="100">100% Full</button>
+          <button type="button" class="seg-btn" data-layout="80">80% TKL</button>
+          <button type="button" class="seg-btn" data-layout="75">75%</button>
+          <button type="button" class="seg-btn" data-layout="60">60%</button>
+        </div>
+      </div>
+      <div id="heatmap-container" class="heatmap-scroll"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Hourly Activity Distribution (00:00 - 23:00)</h2>
+          <p class="panel-sub">Keystroke volume across each hour of the selected day</p>
+        </div>
+      </div>
+      <div id="hourly-chart" class="hourly-chart"></div>
+    </section>
+
+    <section class="mid-grid">
+      <div class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Top Keys Pressed</h2>
+          <span class="panel-sub">Click to filter</span>
+        </div>
+        <div id="top-keys-list" class="rank-list"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Top Modifier Shortcuts</h2>
+          <span class="panel-sub">Ctrl / Alt / Shift / Win Combos</span>
+        </div>
+        <div id="top-shortcuts-list" class="rank-list"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Per-Application Breakdown</h2>
+          <span class="panel-sub">Click app to filter log</span>
+        </div>
+        <div id="apps-list" class="rank-list"></div>
+      </div>
+    </section>
+
+    <section class="bottom-grid">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">All Keys Pressed on Selected Date</h2>
+            <p class="panel-sub">Complete count for every key pressed</p>
+          </div>
+          <input type="search" id="key-table-search" class="input-ctrl" placeholder="Search key..." />
+        </div>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th class="num-col">#</th>
+                <th>Key</th>
+                <th>Code</th>
+                <th class="num-col">Count</th>
+              </tr>
+            </thead>
+            <tbody id="daily-keys-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Sequential Raw Event Log</h2>
+            <p class="panel-sub">Millisecond-precision keypress stream</p>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="search" id="log-search" class="input-ctrl" placeholder="Filter key, combo, app, window..." />
+            <button type="button" id="btn-prev-page" class="btn">Prev</button>
+            <span id="log-page-info" class="mono-sm">0-0 of 0</span>
+            <button type="button" id="btn-next-page" class="btn">Next</button>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Key</th>
+                <th>Modifiers / Combo</th>
+                <th>Application</th>
+                <th>Active Window Title</th>
+              </tr>
+            </thead>
+            <tbody id="raw-events-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>
