@@ -15,7 +15,7 @@ import uvicorn
 
 from src.api import create_app
 from src.collector import EventCollector
-from src.config import load_settings
+from src.config import get_app_dir, load_settings
 from src.database import Database
 from src.hook import Win32KeyboardHook
 from src.tray import SystemTrayApp
@@ -30,7 +30,7 @@ def ensure_std_streams(log_path: Path | None = None) -> None:
     if sys.stdout is not None and sys.stderr is not None:
         return
     if log_path is None:
-        log_path = Path(__file__).resolve().parent / "data" / "app.log"
+        log_path = get_app_dir() / "data" / "app.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     stream = open(log_path, "a", encoding="utf-8", buffering=1)
     if sys.stdout is None:
@@ -59,14 +59,19 @@ def is_port_in_use(host: str, port: int) -> bool:
 
 def spawn_background_worker(child_args: list[str]) -> int:
     """Spawn a detached background process that survives when the parent CMD window is closed."""
-    base_dir = Path(__file__).resolve().parent
+    base_dir = get_app_dir()
     log_path = base_dir / "data" / "app.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_file = open(log_path, "a", encoding="utf-8", buffering=1)
 
+    if getattr(sys, "frozen", False):
+        cmd = [sys.executable, *child_args]
+    else:
+        cmd = [sys.executable, str(Path(__file__).resolve()), *child_args]
+
     flags = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW
     proc = subprocess.Popen(
-        [sys.executable, str(Path(__file__).resolve()), *child_args],
+        cmd,
         cwd=str(base_dir),
         creationflags=flags,
         stdin=subprocess.DEVNULL,

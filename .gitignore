@@ -32,6 +32,11 @@ exports/
 .coverage
 htmlcov/
 
+# PyInstaller build artifacts
+build/
+dist/
+*.spec
+
 # OS & Editor files
 .DS_Store
 Thumbs.db

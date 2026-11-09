@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from src.analytics import compute_daily_analytics
 from src.collector import EventCollector
+from src.config import get_resource_dir
 from src.database import Database
 from src.exporter import export_events
 
@@ -24,7 +25,7 @@ def create_app(
     app = FastAPI(title="Windows Keyboard Analytics", version="1.0.0")
 
     if static_dir is None:
-        default_static = Path(__file__).resolve().parent.parent / "static"
+        default_static = get_resource_dir() / "static"
         if default_static.exists():
             static_dir = default_static
 

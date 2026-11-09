@@ -1,35 +1,62 @@
 # Windows Keyboard Analytics
 
-A lightweight Windows keyboard analytics application that runs quietly in the System Tray, records every key press event (with millisecond timestamps, active modifiers, and foreground application/window context), and serves a real-time interactive Web Dashboard on `http://127.0.0.1:8765`.
+A local-first keyboard analytics tool for Windows. It runs quietly in the System Tray, records your keystrokes and active window context, and serves a live web dashboard at `http://127.0.0.1:8765`.
 
-## Features
+All recorded data stays on your machine in a local SQLite database (`data/keyboard_analytics.db`). Nothing is sent over the network.
 
-- **Low-Level Win32 Keyboard Capture (`WH_KEYBOARD_LL`)**: Records every key press event (including key hold auto-repeats) with zero typing lag using an asynchronous queue and SQLite WAL micro-batching.
-- **Interactive Visual Keyboard Heatmap**: Supports **100% Full-size**, **80% TKL**, **75%**, and **60%** US ANSI keyboard layouts with heat-map color scaling, per-key press counts, click-to-filter, and live WebSocket key-flash animation.
-- **Daily & Hourly Analytics**: Tracks total keystrokes, unique keys, top keys, clickable top modifier shortcuts (`Ctrl+C`, `Ctrl+V`, `Alt+Tab`), and 24-hour activity distribution (`00:00`–`23:00`).
-- **Typing Speed (WPM)**: Calculates Average Active WPM, Peak WPM (across active bursts and rolling 60-second windows), and total active typing duration per day.
-- **Per-Application Breakdown**: Ranks foreground applications (`Code.exe`, `chrome.exe`, etc.) by keystroke volume and displays the top 5 keys pressed inside each app.
-- **Daily Key Table & Raw Event Log**: Inspect complete key counts for any recorded date and browse the paginated, searchable millisecond-precision raw event log (`100` events/page) with live WebSocket row prepending.
-- **Horizontal Key Stream**: View keystrokes as a horizontal sequence (`250` events/page) with:
-  - **Display Modes**: Toggle between `1:1 Raw` (every raw event) and `Readable` (hides standalone modifier holds and inserts line breaks on `Enter`).
-  - **Sort Order**: Switch between `Old → New` (chronological flow with auto-scroll to newest) and `New → Old`.
-  - **Independent Search & Tooltips**: Filter by key, shortcut combo, app, or window title, and hover any keycap chip for full timestamp and window metadata.
-- **Cross-Panel Filtering**: Click any keycap on the heatmap, top keys list, top modifier shortcuts list, all-keys table, or application breakdown to filter both the Raw Event Log and Horizontal Key Stream simultaneously.
-- **System Tray & Data Export**: Pause/Resume recording or open the dashboard from the Windows System Tray, and export daily or date-range data as **Raw CSV**, **Daily Summary CSV**, or **JSON**.
+## What it does
 
-## Quick Start
+### Visual keyboard heatmap
+See which keys you press most on an interactive keyboard layout. You can switch between 100% Full-size, 80% TKL, 75%, and 60% US ANSI layouts, watch keys light up in real time as you type, and click any keycap to filter the logs below.
+
+### Typing speed and daily activity
+Track your daily keystroke count, unique keys pressed, active typing time, and typing speed (both average active WPM and peak WPM). A 24-hour chart breaks down your typing volume by hour of the day.
+
+### Per-app and shortcut breakdown
+See which applications (`Code.exe`, `chrome.exe`, and others) get the most keystrokes and check the top 5 keys pressed inside each app. The dashboard also tracks your most frequent modifier shortcuts such as `Ctrl+C`, `Ctrl+V`, and `Alt+Tab`.
+
+### Live key stream and raw event log
+Inspect your typing history in two synchronized views:
+- A horizontal key stream (`250` events per page) with a `1:1 Raw` mode and a `Readable` mode that hides standalone modifier presses and breaks lines on `Enter`.
+- A searchable raw event table (`100` events per page) with millisecond timestamps, active modifiers, and window titles.
+
+Clicking any key, shortcut, or application in the dashboard filters both views at the same time.
+
+### System tray controls and export
+Pause or resume recording anytime from the Windows System Tray icon. You can also export your data for a single day or a custom date range as Raw CSV, Daily Summary CSV, or JSON.
+
+## Requirements
+
+- Windows 10 or Windows 11
+- Python 3.10 or newer
+
+## Getting started
+
+### Option 1: Download the Windows executable (no Python required)
+
+1. Go to the [Releases](https://github.com/faarismuda/Keyboard-Analytics/releases) page and download `KeyboardAnalytics-windows-x64.zip` (or `KeyboardAnalytics.exe`).
+2. Run `KeyboardAnalytics.exe`.
+3. The app starts in your Windows System Tray and opens the dashboard at `http://127.0.0.1:8765`.
+
+### Option 2: Run from source with Python
 
 ```powershell
-# 1. Install dependencies
+# 1. Clone the repository
+git clone https://github.com/faarismuda/Keyboard-Analytics.git
+cd Keyboard-Analytics
+
+# 2. Install dependencies
 pip install -r requirements.txt
 
-# 2. Start the application (detaches to background, adds System Tray icon, and opens dashboard)
+# 3. Start the application
 python run.py
 ```
 
-The dashboard opens automatically at `http://127.0.0.1:8765`. If the service is already running in the background, running `python run.py` again simply opens the dashboard in your browser. You can also launch it without a console window using `pythonw run.py` (logs are written to `data/app.log`).
+Running `python run.py` starts the background service, adds an icon to your Windows System Tray, and opens the dashboard at `http://127.0.0.1:8765`.
 
-### CLI Options
+If the app is already running, running `python run.py` again simply opens the dashboard in your browser. You can also start it without a console window using `pythonw run.py` (logs are saved to `data/app.log`).
+
+### CLI options
 
 ```powershell
 python run.py [options]
@@ -39,27 +66,38 @@ python run.py [options]
 | :--- | :--- |
 | `--host HOST` | Bind address for the web server (default: `127.0.0.1`) |
 | `--port PORT` | Bind port for the web server (default: `8765`) |
-| `--foreground` | Keep the process attached to the current terminal instead of spawning a detached background worker |
+| `--foreground` | Run attached to the current terminal instead of spawning a background process |
 | `--no-tray` | Run without the Windows System Tray icon |
-| `--no-browser` | Do not open the web browser automatically on startup |
-| `--no-hook` | Disable the low-level Win32 keyboard hook (useful for testing the web dashboard standalone) |
+| `--no-browser` | Do not open the browser automatically on startup |
+| `--no-hook` | Run the web server without the Windows keyboard hook (useful for frontend work) |
 
-## Project Structure
+## Project structure
 
-- `run.py` — Application entrypoint, background process spawner, and CLI argument parser
-- `src/hook.py` — Dedicated Win32 `WH_KEYBOARD_LL` message-pump thread
-- `src/keymap.py` — Virtual-Key (`VK_*`) and extended scan-flag normalization
-- `src/window_tracker.py` — Foreground window title and executable name resolver
-- `src/collector.py` — Modifier state tracker, async queue consumer, SQLite batch writer, and live event broadcaster
-- `src/database.py` — Thread-safe SQLite WAL storage and paginated query engine
-- `src/analytics.py` — Daily summary, WPM burst/rolling calculation, and per-app aggregation
-- `src/exporter.py` — Raw and daily summary CSV/JSON serializer
-- `src/api.py` — FastAPI REST endpoints (`/api/status`, `/api/analytics/daily`, `/api/events`, `/api/export`) and `/ws/live` WebSocket
-- `src/tray.py` — Windows System Tray icon and menu (`pystray` + `Pillow`)
-- `static/` — Vanilla HTML5, CSS, and ES Module JavaScript frontend (`app.js`, `heatmap.js`, `layouts.js`, `charts.js`, `log_viewer.js`)
+| Path | Purpose |
+| :--- | :--- |
+| `run.py` | CLI entrypoint and background process launcher |
+| `src/hook.py` | Win32 keyboard listener thread (`WH_KEYBOARD_LL`) |
+| `src/keymap.py` | Virtual-key and scan-code normalization |
+| `src/window_tracker.py` | Foreground window title and executable lookup |
+| `src/collector.py` | Modifier state tracking, event batching, and live WebSocket broadcast |
+| `src/database.py` | SQLite storage and query layer |
+| `src/analytics.py` | Daily stats, WPM calculations, and per-app aggregation |
+| `src/exporter.py` | CSV and JSON data export |
+| `src/api.py` | FastAPI REST routes and `/ws/live` WebSocket endpoint |
+| `src/tray.py` | Windows System Tray icon and menu (`pystray` and `Pillow`) |
+| `static/` | Vanilla HTML, CSS, and ES module JavaScript frontend |
+| `tests/` | Automated test suite (`pytest`) |
 
-## Running Tests
+## Running tests
 
 ```powershell
 pytest -v
 ```
+
+## Contributing
+
+Contributions, bug reports, and feature ideas are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions and pull request guidelines.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
