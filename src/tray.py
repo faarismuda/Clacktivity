@@ -67,9 +67,9 @@ class SystemTrayApp:
             paused = bool(payload.get("is_paused", False))
             self._icon.icon = create_tray_icon_image(is_paused=paused)
             self._icon.title = (
-                "Keyboard Analytics (Paused)"
+                "Clacktivity (Paused)"
                 if paused
-                else "Keyboard Analytics (Recording)"
+                else "Clacktivity (Recording)"
             )
             self._icon.update_menu()
 
@@ -101,9 +101,9 @@ class SystemTrayApp:
             pystray.MenuItem("Quit", self._quit_app),
         )
         self._icon = pystray.Icon(
-            name="KeyboardAnalytics",
+            name="Clacktivity",
             icon=create_tray_icon_image(is_paused=self.collector.is_paused),
-            title="Keyboard Analytics (Recording)",
+            title="Clacktivity (Recording)",
             menu=menu,
         )
         self._icon.run()

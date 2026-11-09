@@ -1,4 +1,4 @@
-"""Configuration settings for Windows Keyboard Analytics."""
+"""Configuration settings for Clacktivity."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,13 +30,23 @@ def get_resource_dir() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def resolve_db_path(base_dir: Path) -> Path:
+    """Resolve the SQLite database path, preserving existing legacy database files."""
+    data_dir = base_dir / "data"
+    default_db = data_dir / "clacktivity.db"
+    legacy_db = data_dir / "keyboard_analytics.db"
+    if legacy_db.exists() and not default_db.exists():
+        return legacy_db
+    return default_db
+
+
 def load_settings() -> Settings:
     """Load default application settings."""
     base_dir = get_app_dir()
     return Settings(
         host="127.0.0.1",
         port=8765,
-        db_path=base_dir / "data" / "keyboard_analytics.db",
+        db_path=resolve_db_path(base_dir),
         batch_interval_sec=0.25,
         batch_max_size=50,
     )

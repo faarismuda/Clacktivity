@@ -52,7 +52,7 @@ def test_api_endpoints(tmp_path: Path):
 
     index_res = client.get("/")
     assert index_res.status_code == 200
-    assert "Keyboard Analytics" in index_res.text
+    assert "Clacktivity" in index_res.text
 
     js_res = client.get("/static/js/app.js")
     assert js_res.status_code == 200

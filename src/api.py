@@ -22,7 +22,7 @@ def create_app(
     static_dir: Path | None = None,
 ) -> FastAPI:
     """Create and configure the FastAPI application instance."""
-    app = FastAPI(title="Windows Keyboard Analytics", version="1.0.0")
+    app = FastAPI(title="Clacktivity", version="1.0.0")
 
     if static_dir is None:
         default_static = get_resource_dir() / "static"

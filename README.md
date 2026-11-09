@@ -1,8 +1,8 @@
-# Windows Keyboard Analytics
+# Clacktivity
 
-A local-first keyboard analytics tool for Windows. It runs quietly in the System Tray, records your keystrokes and active window context, and serves a live web dashboard at `http://127.0.0.1:8765`.
+A local-first keyboard activity and analytics tracker for Windows. Clacktivity runs quietly in the System Tray, records your keystrokes and active window context, and serves a live web dashboard at `http://127.0.0.1:8765`.
 
-All recorded data stays on your machine in a local SQLite database (`data/keyboard_analytics.db`). Nothing is sent over the network.
+All recorded data stays on your machine in a local SQLite database (`data/clacktivity.db`). Nothing is sent over the network.
 
 ## What it does
 
@@ -28,22 +28,22 @@ Pause or resume recording anytime from the Windows System Tray icon. You can als
 ## Requirements
 
 - Windows 10 or Windows 11
-- Python 3.10 or newer
+- Python 3.10 or newer (only required if running from source)
 
 ## Getting started
 
 ### Option 1: Download the Windows executable (no Python required)
 
-1. Go to the [Releases](https://github.com/faarismuda/Keyboard-Analytics/releases) page and download `KeyboardAnalytics-windows-x64.zip` (or `KeyboardAnalytics.exe`).
-2. Run `KeyboardAnalytics.exe`.
+1. Go to the [Releases](https://github.com/faarismuda/Clacktivity/releases) page and download `Clacktivity-windows-x64.zip` (or `Clacktivity.exe`).
+2. Run `Clacktivity.exe`.
 3. The app starts in your Windows System Tray and opens the dashboard at `http://127.0.0.1:8765`.
 
 ### Option 2: Run from source with Python
 
 ```powershell
 # 1. Clone the repository
-git clone https://github.com/faarismuda/Keyboard-Analytics.git
-cd Keyboard-Analytics
+git clone https://github.com/faarismuda/Clacktivity.git
+cd Clacktivity
 
 # 2. Install dependencies
 pip install -r requirements.txt

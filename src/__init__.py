@@ -1,1 +1,1 @@
-"""Windows Keyboard Analytics package."""
+"""Clacktivity package."""

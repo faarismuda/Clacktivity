@@ -1,4 +1,4 @@
-"""Application entrypoint for Windows Keyboard Analytics."""
+"""Application entrypoint for Clacktivity."""
 
 import argparse
 from pathlib import Path
@@ -84,7 +84,7 @@ def spawn_background_worker(child_args: list[str]) -> int:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse CLI arguments for host, port, and runtime mode."""
-    parser = argparse.ArgumentParser(description="Windows Keyboard Analytics")
+    parser = argparse.ArgumentParser(description="Clacktivity")
     parser.add_argument("--host", type=str, default=None, help="Bind host (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=None, help="Bind port (default: 8765)")
     parser.add_argument("--foreground", action="store_true", help="Keep process attached to current terminal")
@@ -95,7 +95,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Initialize components and run the Keyboard Analytics service."""
+    """Initialize components and run the Clacktivity service."""
     ensure_std_streams()
     raw_argv = list(argv) if argv is not None else sys.argv[1:]
     args = parse_args(raw_argv)
@@ -106,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
     dashboard_url = f"http://{host}:{port}"
 
     if is_port_in_use(host, port):
-        print(f"Keyboard Analytics is already running in the background at {dashboard_url}")
+        print(f"Clacktivity is already running in the background at {dashboard_url}")
         if not args.no_browser:
             webbrowser.open(dashboard_url)
         return 0
@@ -117,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
             if is_port_in_use(host, port):
                 break
             time.sleep(0.15)
-        print(f"Keyboard Analytics started in background (PID {pid}) at {dashboard_url}")
+        print(f"Clacktivity started in background (PID {pid}) at {dashboard_url}")
         print("You can safely close this terminal window. Use the System Tray icon to Quit.")
         return 0
 
@@ -154,7 +154,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.no_browser:
         threading.Timer(0.8, lambda: webbrowser.open(dashboard_url)).start()
 
-    print(f"Keyboard Analytics running at {dashboard_url}")
+    print(f"Clacktivity running at {dashboard_url}")
     print("Press Ctrl+C or use the System Tray icon to quit.")
 
     if args.no_tray:

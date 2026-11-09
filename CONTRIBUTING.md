@@ -1,4 +1,4 @@
-# Contributing to Windows Keyboard Analytics
+# Contributing to Clacktivity
 
 Thanks for your interest in contributing. This document covers how to set up your development environment, run the app locally, and submit changes.
 
@@ -7,8 +7,8 @@ Thanks for your interest in contributing. This document covers how to set up you
 1. Fork the repository on GitHub and clone your fork locally:
 
 ```powershell
-git clone https://github.com/<your-username>/Keyboard-Analytics.git
-cd Keyboard-Analytics
+git clone https://github.com/<your-username>/Clacktivity.git
+cd Clacktivity
 ```
 
 2. Create and activate a virtual environment:

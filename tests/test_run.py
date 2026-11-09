@@ -50,7 +50,7 @@ def test_windowless_pythonw_streams_and_uvicorn_config(tmp_path: Path, monkeypat
 def test_frozen_mode_paths_and_settings(tmp_path: Path, monkeypatch):
     dist_dir = tmp_path / "dist"
     dist_dir.mkdir(parents=True, exist_ok=True)
-    exe_path = dist_dir / "KeyboardAnalytics.exe"
+    exe_path = dist_dir / "Clacktivity.exe"
     mei_dir = tmp_path / "_mei_bundle"
     mei_dir.mkdir(parents=True, exist_ok=True)
 
@@ -60,11 +60,17 @@ def test_frozen_mode_paths_and_settings(tmp_path: Path, monkeypatch):
 
     assert get_app_dir() == dist_dir.resolve()
     assert get_resource_dir() == mei_dir.resolve()
-    assert load_settings().db_path == dist_dir.resolve() / "data" / "keyboard_analytics.db"
+    assert load_settings().db_path == dist_dir.resolve() / "data" / "clacktivity.db"
+
+    # Legacy database fallback when keyboard_analytics.db already exists
+    legacy_db = dist_dir / "data" / "keyboard_analytics.db"
+    legacy_db.parent.mkdir(parents=True, exist_ok=True)
+    legacy_db.write_bytes(b"sqlite")
+    assert load_settings().db_path == legacy_db.resolve()
 
 
 def test_spawn_background_worker_frozen_omits_script_path(tmp_path: Path, monkeypatch):
-    exe_path = tmp_path / "KeyboardAnalytics.exe"
+    exe_path = tmp_path / "Clacktivity.exe"
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(sys, "executable", str(exe_path))
 
