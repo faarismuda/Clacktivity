@@ -1,5 +1,7 @@
+import pytest
 from pathlib import Path
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 from src.database import Database
 from src.collector import EventCollector
 from src.hook import RawKeyEvent
@@ -165,6 +167,122 @@ def test_visual_ui_and_filter_reset_fixes(tmp_path: Path):
 
     viewer_js = client.get("/static/js/log_viewer.js").text
     assert 'containerEl.scrollTop = order === "asc" ? containerEl.scrollHeight : 0' in viewer_js
+
+
+def test_api_and_websocket_password_lock_flow(tmp_path: Path):
+    db = Database(tmp_path / "auth_api.db")
+    db.init_db()
+    collector = EventCollector(db=db, window_provider=lambda: ("Code.exe", "VS Code"))
+    app = create_app(db=db, collector=collector)
+    client = TestClient(app)
+
+    # 1. Initially unlocked
+    auth_status = client.get("/api/auth/status").json()
+    assert auth_status == {
+        "password_enabled": False,
+        "authenticated": True,
+        "token_expiration_hours": 2,
+    }
+    assert client.get("/api/status").status_code == 200
+
+    # 2. Validation when enabling password
+    missing_pwd_res = client.post("/api/auth/password", json={"token_expiration_hours": 4})
+    assert missing_pwd_res.status_code == 400
+
+    # Enable password via POST /api/auth/password
+    set_res = client.post(
+        "/api/auth/password",
+        json={"new_password": "secret123", "token_expiration_hours": 4},
+    )
+    assert set_res.status_code == 200
+    assert set_res.json()["password_enabled"] is True
+
+    bad_exp_res = client.post(
+        "/api/auth/password",
+        json={"current_password": "secret123", "token_expiration_hours": "not-a-number"},
+    )
+    assert bad_exp_res.status_code == 400
+
+    # Fresh unauthenticated client should be blocked from API and WebSocket
+    anon_client = TestClient(app)
+    anon_status = anon_client.get("/api/auth/status").json()
+    assert anon_status == {
+        "password_enabled": True,
+        "authenticated": False,
+        "token_expiration_hours": 4,
+    }
+    assert anon_client.get("/api/status").status_code == 401
+    assert anon_client.post("/api/status/toggle").status_code == 401
+    assert anon_client.get("/api/analytics/daily").status_code == 401
+    assert anon_client.get("/api/events").status_code == 401
+    assert anon_client.get("/api/export").status_code == 401
+
+    with pytest.raises(WebSocketDisconnect) as exc_info:
+        with anon_client.websocket_connect("/ws/live") as ws:
+            ws.receive_json()
+    assert exc_info.value.code == 1008
+
+    # 3. Wrong password returns 401, correct password logs in and sets cookie
+    bad_login = anon_client.post("/api/auth/login", json={"password": "wrong"})
+    assert bad_login.status_code == 401
+
+    good_login = anon_client.post("/api/auth/login", json={"password": "secret123"})
+    assert good_login.status_code == 200
+    assert anon_client.get("/api/status").status_code == 200
+
+    with anon_client.websocket_connect("/ws/live") as ws:
+        msg = ws.receive_json()
+        assert msg["type"] == "status"
+
+    # 4. Changing or disabling password requires current_password
+    unauth_disable = anon_client.post(
+        "/api/auth/password",
+        json={"current_password": "wrong", "disable": True},
+    )
+    assert unauth_disable.status_code == 401
+
+    # 5. Logout locks the session again
+    anon_client.post("/api/auth/logout")
+    assert anon_client.get("/api/status").status_code == 401
+
+    # 6. Disable password lock using valid current_password
+    disable_res = client.post(
+        "/api/auth/password",
+        json={"current_password": "secret123", "disable": True},
+    )
+    assert disable_res.status_code == 200
+    assert disable_res.json()["password_enabled"] is False
+    assert anon_client.get("/api/status").status_code == 200
+
+
+def test_password_lock_ui_markup_and_module(tmp_path: Path):
+    db = Database(tmp_path / "ui_lock.db")
+    db.init_db()
+    collector = EventCollector(db=db, window_provider=lambda: ("Code.exe", "VS Code"))
+    app = create_app(db=db, collector=collector)
+    client = TestClient(app)
+
+    html = client.get("/").text
+    assert 'id="btn-security"' in html
+    assert 'id="btn-lock-now"' in html
+    assert 'id="lock-overlay"' in html
+    assert 'id="lock-form"' in html
+    assert 'id="security-modal"' in html
+    assert 'id="security-form"' in html
+
+    auth_js = client.get("/static/js/auth.js")
+    assert auth_js.status_code == 200
+    assert "export async function initAuth" in auth_js.text
+    assert "/api/auth/login" in auth_js.text
+    assert "/api/auth/logout" in auth_js.text
+    assert "/api/auth/password" in auth_js.text
+
+    css = client.get("/static/css/styles.css").text
+    assert ".lock-overlay" in css
+    assert ".modal-backdrop" in css
+    assert "--accent-rose:" in css
+
+
 
 
 

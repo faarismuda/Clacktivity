@@ -25,6 +25,9 @@ Clicking any key, shortcut, or application in the dashboard filters both views a
 ### System tray controls and export
 Pause or resume recording anytime from the Windows System Tray icon. You can also export your data for a single day or a custom date range as Raw CSV, Daily Summary CSV, or JSON.
 
+### Master password lock
+Protect your dashboard with an optional master password. When enabled, dashboard views, REST APIs, and live WebSocket streams require an authenticated session. You can customize the session expiration duration (1 to 720 hours) and lock the dashboard immediately using the "Lock Now" button.
+
 ## Requirements
 
 - Windows 10 or Windows 11
@@ -70,6 +73,8 @@ python run.py [options]
 | `--no-tray` | Run without the Windows System Tray icon |
 | `--no-browser` | Do not open the browser automatically on startup |
 | `--no-hook` | Run the web server without the Windows keyboard hook (useful for frontend work) |
+| `--set-password PASSWORD` | Set or update the master password and exit |
+| `--reset-password` | Disable master password protection and exit |
 
 ## Project structure
 
@@ -81,6 +86,7 @@ python run.py [options]
 | `src/window_tracker.py` | Foreground window title and executable lookup |
 | `src/collector.py` | Modifier state tracking, event batching, and live WebSocket broadcast |
 | `src/database.py` | SQLite storage and query layer |
+| `src/auth.py` | Password hashing, signed session tokens, and login rate-limiting |
 | `src/analytics.py` | Daily stats, WPM calculations, and per-app aggregation |
 | `src/exporter.py` | CSV and JSON data export |
 | `src/api.py` | FastAPI REST routes and `/ws/live` WebSocket endpoint |

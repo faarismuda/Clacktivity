@@ -14,15 +14,14 @@ import webbrowser
 import uvicorn
 
 from src.api import create_app
+from src.auth import AuthManager
 from src.collector import EventCollector
 from src.config import get_app_dir, load_settings
 from src.database import Database
 from src.hook import Win32KeyboardHook
 from src.tray import SystemTrayApp
 
-DETACHED_PROCESS = 0x00000008
-CREATE_NEW_PROCESS_GROUP = 0x00000200
-CREATE_NO_WINDOW = 0x08000000
+DETACHED_PROCESS, CREATE_NEW_PROCESS_GROUP, CREATE_NO_WINDOW = 0x00000008, 0x00000200, 0x08000000
 
 
 def ensure_std_streams(log_path: Path | None = None) -> None:
@@ -41,13 +40,7 @@ def ensure_std_streams(log_path: Path | None = None) -> None:
 
 def create_uvicorn_config(app: Any, host: str, port: int) -> uvicorn.Config:
     """Create a Uvicorn Config safe for both console python.exe and windowless pythonw.exe."""
-    return uvicorn.Config(
-        app=app,
-        host=host,
-        port=port,
-        log_level="warning",
-        log_config=None,
-    )
+    return uvicorn.Config(app=app, host=host, port=port, log_level="warning", log_config=None)
 
 
 def is_port_in_use(host: str, port: int) -> bool:
@@ -63,21 +56,10 @@ def spawn_background_worker(child_args: list[str]) -> int:
     log_path = base_dir / "data" / "app.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_file = open(log_path, "a", encoding="utf-8", buffering=1)
-
-    if getattr(sys, "frozen", False):
-        cmd = [sys.executable, *child_args]
-    else:
-        cmd = [sys.executable, str(Path(__file__).resolve()), *child_args]
-
-    flags = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW
+    cmd = [sys.executable, *(child_args if getattr(sys, "frozen", False) else [str(Path(__file__).resolve()), *child_args])]
     proc = subprocess.Popen(
-        cmd,
-        cwd=str(base_dir),
-        creationflags=flags,
-        stdin=subprocess.DEVNULL,
-        stdout=log_file,
-        stderr=log_file,
-        close_fds=True,
+        cmd, cwd=str(base_dir), creationflags=DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW,
+        stdin=subprocess.DEVNULL, stdout=log_file, stderr=log_file, close_fds=True,
     )
     return int(proc.pid)
 
@@ -91,6 +73,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--no-tray", action="store_true", help="Run without Windows System Tray icon")
     parser.add_argument("--no-browser", action="store_true", help="Do not open browser automatically on start")
     parser.add_argument("--no-hook", action="store_true", help="Disable low-level Win32 keyboard hook")
+    parser.add_argument("--set-password", type=str, default=None, help="Set or update master password and exit")
+    parser.add_argument("--reset-password", action="store_true", help="Disable master password lock and exit")
     return parser.parse_args(argv)
 
 
@@ -98,11 +82,25 @@ def main(argv: list[str] | None = None) -> int:
     """Initialize components and run the Clacktivity service."""
     ensure_std_streams()
     raw_argv = list(argv) if argv is not None else sys.argv[1:]
-    args = parse_args(raw_argv)
-    settings = load_settings()
+    args, settings = parse_args(raw_argv), load_settings()
 
-    host = args.host or settings.host
-    port = args.port or settings.port
+    if args.set_password is not None or args.reset_password:
+        db = Database(settings.db_path)
+        db.init_db()
+        auth = AuthManager(db)
+        if args.reset_password:
+            auth.clear_password()
+            print("Password lock has been disabled.")
+            return 0
+        try:
+            auth.set_password(args.set_password)
+        except ValueError as exc:
+            print(f"Error: {exc}")
+            return 1
+        print("Master password has been updated.")
+        return 0
+
+    host, port = args.host or settings.host, args.port or settings.port
     dashboard_url = f"http://{host}:{port}"
 
     if is_port_in_use(host, port):
@@ -123,11 +121,8 @@ def main(argv: list[str] | None = None) -> int:
 
     db = Database(settings.db_path)
     db.init_db()
-
     collector = EventCollector(
-        db=db,
-        batch_interval_sec=settings.batch_interval_sec,
-        batch_max_size=settings.batch_max_size,
+        db=db, batch_interval_sec=settings.batch_interval_sec, batch_max_size=settings.batch_max_size
     )
     collector.start_worker()
 
@@ -154,8 +149,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.no_browser:
         threading.Timer(0.8, lambda: webbrowser.open(dashboard_url)).start()
 
-    print(f"Clacktivity running at {dashboard_url}")
-    print("Press Ctrl+C or use the System Tray icon to quit.")
+    print(f"Clacktivity running at {dashboard_url}\nPress Ctrl+C or use the System Tray icon to quit.")
 
     if args.no_tray:
         if threading.current_thread() is threading.main_thread():
@@ -170,11 +164,7 @@ def main(argv: list[str] | None = None) -> int:
     server_thread = threading.Thread(target=server.run, name="UvicornServer", daemon=True)
     server_thread.start()
 
-    tray = SystemTrayApp(
-        collector=collector,
-        dashboard_url=dashboard_url,
-        on_quit=shutdown_all,
-    )
+    tray = SystemTrayApp(collector=collector, dashboard_url=dashboard_url, on_quit=shutdown_all)
     if threading.current_thread() is threading.main_thread():
         signal.signal(signal.SIGINT, lambda *_: (tray.stop(), shutdown_all()))
     try:

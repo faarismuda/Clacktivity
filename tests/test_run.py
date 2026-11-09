@@ -91,3 +91,34 @@ def test_spawn_background_worker_frozen_omits_script_path(tmp_path: Path, monkey
     assert captured["cmd"] == [str(exe_path), "--foreground", "--port", "8765"]
     assert captured["cwd"] == str(tmp_path.resolve())
 
+
+def test_cli_set_and_reset_password(tmp_path: Path, monkeypatch):
+    from src.config import Settings
+    from src.auth import AuthManager
+    from src.database import Database
+
+    db_file = tmp_path / "cli_auth.db"
+    monkeypatch.setattr(
+        "run.load_settings",
+        lambda: Settings(
+            host="127.0.0.1",
+            port=18765,
+            db_path=db_file,
+            batch_interval_sec=0.25,
+            batch_max_size=50,
+        ),
+    )
+
+    rc_set = main(["--set-password", "cli_secret"])
+    assert rc_set == 0
+
+    db = Database(db_file)
+    auth = AuthManager(db)
+    assert auth.is_password_enabled() is True
+    assert auth.verify_password("cli_secret") is True
+
+    rc_reset = main(["--reset-password"])
+    assert rc_reset == 0
+    assert auth.is_password_enabled() is False
+
+

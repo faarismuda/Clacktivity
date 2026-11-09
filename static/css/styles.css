@@ -12,6 +12,7 @@
   --accent-amber: oklch(0.76 0.16 68);
   --accent-copper: oklch(0.66 0.19 42);
   --accent-teal: oklch(0.72 0.12 195);
+  --accent-rose: oklch(0.70 0.18 22);
   --status-live: oklch(0.72 0.17 152);
   --status-paused: oklch(0.76 0.16 75);
   --font-sans: "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
@@ -361,4 +362,23 @@ body {
 .stream-chip-live { border-color: var(--accent-amber); box-shadow: 0 0 6px oklch(0.76 0.16 68 / 0.35); }
 .stream-line-break { flex-basis: 100%; height: 0; }
 #log-search, #stream-search { min-width: 230px; }
+
+/* Security & Lock Modals */
+[hidden] { display: none !important; }
+.lock-overlay { position: fixed; inset: 0; background: oklch(0.12 0.02 240 / 0.94); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+.lock-card { background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: 12px; padding: 32px; max-width: 380px; width: 100%; text-align: center; box-shadow: 0 16px 40px oklch(0 0 0 / 0.4); }
+.lock-icon { font-size: 40px; margin-bottom: 12px; }
+.lock-title { font-size: 20px; margin-bottom: 8px; color: var(--text-primary); }
+.lock-desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; }
+.modal-backdrop { position: fixed; inset: 0; background: oklch(0 0 0 / 0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 900; padding: 20px; }
+.modal-card { background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: 10px; max-width: 440px; width: 100%; box-shadow: 0 12px 32px oklch(0 0 0 / 0.35); }
+.modal-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border-subtle); }
+.modal-body { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.form-field { display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.form-field label { font-size: 12px; color: var(--text-secondary); }
+.form-error { font-size: 12px; color: var(--accent-rose); min-height: 16px; }
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-danger { background: oklch(0.3 0.1 25); color: var(--accent-rose); border-color: var(--accent-rose); }
+
 

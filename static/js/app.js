@@ -8,33 +8,18 @@ import {
   insertLiveStreamChip, prependLiveEventRow, renderDailyKeysTable,
   renderHorizontalEventsStream, renderRawEventsTable,
 } from "./log_viewer.js";
+import { initAuth, handleUnauthorized } from "./auth.js";
 
 const state = {
-  today: "",
-  selectedDate: "",
-  availableDates: [],
-  isPaused: false,
-  selectedKey: "",
-  selectedApp: "",
-  keySearch: "",
-  logSearch: "",
-  logOffset: 0,
-  logLimit: 100,
-  logTotal: 0,
-  streamSearch: "",
-  streamOffset: 0,
-  streamLimit: 250,
-  streamTotal: 0,
-  streamMode: "raw",
-  streamOrder: "asc",
-  streamItems: [],
-  dailyReport: null,
+  today: "", selectedDate: "", availableDates: [], isPaused: false,
+  selectedKey: "", selectedApp: "", keySearch: "", logSearch: "",
+  logOffset: 0, logLimit: 100, logTotal: 0,
+  streamSearch: "", streamOffset: 0, streamLimit: 250, streamTotal: 0,
+  streamMode: "raw", streamOrder: "asc", streamItems: [], dailyReport: null,
 };
 
-let heatmap = null;
-let searchDebounce = null;
-let streamSearchDebounce = null;
-let liveAnalyticsTimer = null;
+let heatmap = null, searchDebounce = null, streamSearchDebounce = null;
+let liveAnalyticsTimer = null, wsReconnectTimer = null, liveSocket = null, isLocked = false;
 const $ = (id) => document.getElementById(id);
 
 function formatDuration(seconds) {
@@ -46,16 +31,20 @@ function formatDuration(seconds) {
 
 async function initDashboard() {
   heatmap = new KeyboardHeatmap($("heatmap-container"), (keyCode) => {
-    state.selectedKey = keyCode;
-    state.logOffset = 0;
-    state.streamOffset = 0;
-    refreshSelectionViews();
-    loadRawEvents();
-    loadStreamEvents();
+    state.selectedKey = keyCode; state.logOffset = 0; state.streamOffset = 0;
+    refreshSelectionViews(); loadRawEvents(); loadStreamEvents();
   });
   bindEvents();
-  await loadStatusAndInitialData();
-  connectWebSocket();
+  await initAuth({
+    onAuthenticated: async () => { await loadStatusAndInitialData(); connectWebSocket(); },
+    onLocked: () => { closeWebSocket(); },
+  });
+}
+
+function closeWebSocket() {
+  isLocked = true;
+  clearTimeout(wsReconnectTimer);
+  if (liveSocket) { liveSocket.onclose = null; liveSocket.close(); liveSocket = null; }
 }
 
 function bindEvents() {
@@ -69,14 +58,10 @@ function bindEvents() {
 
   $("date-picker").addEventListener("change", (e) => e.target.value && selectDate(e.target.value));
   $("btn-today").addEventListener("click", () => state.today && selectDate(state.today));
-  $("btn-refresh").addEventListener("click", () => {
-    loadDailyAnalytics();
-    loadRawEvents();
-    loadStreamEvents();
-  });
-
+  $("btn-refresh").addEventListener("click", () => { loadDailyAnalytics(); loadRawEvents(); loadStreamEvents(); });
   $("btn-toggle-pause").addEventListener("click", async () => {
     const res = await fetch("/api/status/toggle", { method: "POST" });
+    if (res.status === 401) { handleUnauthorized(); return; }
     if (res.ok) updatePauseBadge((await res.json()).is_paused);
   });
 
@@ -95,22 +80,12 @@ function bindEvents() {
   });
 
   $("btn-clear-filters").addEventListener("click", () => {
-    clearTimeout(searchDebounce);
-    clearTimeout(streamSearchDebounce);
-    state.selectedKey = "";
-    state.selectedApp = "";
-    state.keySearch = "";
-    state.logSearch = "";
-    state.streamSearch = "";
-    $("key-table-search").value = "";
-    $("log-search").value = "";
-    $("stream-search").value = "";
-    state.logOffset = 0;
-    state.streamOffset = 0;
+    clearTimeout(searchDebounce); clearTimeout(streamSearchDebounce);
+    state.selectedKey = ""; state.selectedApp = ""; state.keySearch = ""; state.logSearch = ""; state.streamSearch = "";
+    $("key-table-search").value = ""; $("log-search").value = ""; $("stream-search").value = "";
+    state.logOffset = 0; state.streamOffset = 0;
     heatmap.setCounts(state.dailyReport?.key_counts || {}, "");
-    refreshSelectionViews();
-    loadRawEvents();
-    loadStreamEvents();
+    refreshSelectionViews(); loadRawEvents(); loadStreamEvents();
   });
 
   $("btn-prev-page").addEventListener("click", () => {
@@ -139,8 +114,7 @@ function bindEvents() {
   });
 
   $("stream-search").addEventListener("input", (e) => {
-    state.streamSearch = e.target.value;
-    state.streamOffset = 0;
+    state.streamSearch = e.target.value; state.streamOffset = 0;
     clearTimeout(streamSearchDebounce);
     streamSearchDebounce = setTimeout(loadStreamEvents, 200);
   });
@@ -163,7 +137,9 @@ function triggerExport(fmt, mode) {
 }
 
 async function loadStatusAndInitialData() {
-  const data = await (await fetch("/api/status")).json();
+  const res = await fetch("/api/status");
+  if (res.status === 401) { handleUnauthorized(); return; }
+  const data = await res.json();
   state.today = data.today;
   state.selectedDate = data.today;
   state.availableDates = data.available_dates || [data.today];
@@ -174,14 +150,10 @@ async function loadStatusAndInitialData() {
 }
 
 function selectDate(dateStr) {
-  state.selectedDate = dateStr;
-  state.logOffset = 0;
-  state.streamOffset = 0;
+  state.selectedDate = dateStr; state.logOffset = 0; state.streamOffset = 0;
   $("date-picker").value = dateStr;
   renderDateHistoryPills();
-  loadDailyAnalytics();
-  loadRawEvents();
-  loadStreamEvents();
+  loadDailyAnalytics(); loadRawEvents(); loadStreamEvents();
 }
 
 function renderDateHistoryPills() {
@@ -198,7 +170,9 @@ function renderDateHistoryPills() {
 }
 
 async function loadDailyAnalytics() {
-  const report = await (await fetch(`/api/analytics/daily?date=${encodeURIComponent(state.selectedDate)}`)).json();
+  const res = await fetch(`/api/analytics/daily?date=${encodeURIComponent(state.selectedDate)}`);
+  if (res.status === 401) { handleUnauthorized(); return; }
+  const report = await res.json();
   state.dailyReport = report;
   renderSummaryKpis(report.summary);
   heatmap.setCounts(report.key_counts, state.selectedKey);
@@ -208,21 +182,15 @@ async function loadDailyAnalytics() {
 
 function handleKeyFilterToggle(keyCode) {
   state.selectedKey = state.selectedKey === keyCode ? "" : keyCode;
-  state.logOffset = 0;
-  state.streamOffset = 0;
+  state.logOffset = 0; state.streamOffset = 0;
   heatmap.setCounts(state.dailyReport?.key_counts || {}, state.selectedKey);
-  refreshSelectionViews();
-  loadRawEvents();
-  loadStreamEvents();
+  refreshSelectionViews(); loadRawEvents(); loadStreamEvents();
 }
 
 function handleAppFilterToggle(appName) {
   state.selectedApp = state.selectedApp === appName ? "" : appName;
-  state.logOffset = 0;
-  state.streamOffset = 0;
-  refreshSelectionViews();
-  loadRawEvents();
-  loadStreamEvents();
+  state.logOffset = 0; state.streamOffset = 0;
+  refreshSelectionViews(); loadRawEvents(); loadStreamEvents();
 }
 
 function refreshSelectionViews() {
@@ -259,7 +227,9 @@ async function loadRawEvents() {
     app: state.selectedApp,
     search: state.logSearch,
   });
-  const data = await (await fetch(`/api/events?${params.toString()}`)).json();
+  const res = await fetch(`/api/events?${params.toString()}`);
+  if (res.status === 401) { handleUnauthorized(); return; }
+  const data = await res.json();
   state.logTotal = data.total || 0;
   renderRawEventsTable($("raw-events-tbody"), data.items);
   renderLogPageInfo();
@@ -282,7 +252,9 @@ async function loadStreamEvents() {
     app: state.selectedApp,
     search: state.streamSearch,
   });
-  const data = await (await fetch(`/api/events?${params.toString()}`)).json();
+  const res = await fetch(`/api/events?${params.toString()}`);
+  if (res.status === 401) { handleUnauthorized(); return; }
+  const data = await res.json();
   state.streamTotal = data.total || 0;
   state.streamItems = data.items || [];
   renderHorizontalEventsStream($("horizontal-events-stream"), state.streamItems, state.streamOrder, state.streamMode);
@@ -310,8 +282,12 @@ function updatePauseBadge(isPaused) {
 }
 
 function connectWebSocket() {
+  isLocked = false;
+  clearTimeout(wsReconnectTimer);
+  if (liveSocket) { liveSocket.onclose = null; liveSocket.close(); }
   const proto = window.location.protocol === "https:" ? "wss" : "ws";
   const ws = new WebSocket(`${proto}://${window.location.host}/ws/live`);
+  liveSocket = ws;
   ws.onmessage = (msg) => {
     const payload = JSON.parse(msg.data);
     if (payload.type === "status") updatePauseBadge(payload.is_paused);
@@ -337,7 +313,9 @@ function connectWebSocket() {
       }
     }
   };
-  ws.onclose = () => setTimeout(connectWebSocket, 2500);
+  ws.onclose = () => {
+    if (!isLocked && liveSocket === ws) wsReconnectTimer = setTimeout(connectWebSocket, 2500);
+  };
 }
 
 document.addEventListener("DOMContentLoaded", initDashboard);

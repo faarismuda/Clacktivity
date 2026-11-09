@@ -101,3 +101,20 @@ def test_paginated_events_search_matches_modifiers_column(tmp_path: Path):
     assert res["total"] == 1
 
 
+def test_app_settings_crud(tmp_path: Path):
+    db = Database(tmp_path / "settings.db")
+    db.init_db()
+
+    assert db.get_setting("missing_key") is None
+    assert db.get_setting("missing_key", "fallback") == "fallback"
+
+    db.set_setting("theme", "dark")
+    assert db.get_setting("theme") == "dark"
+
+    db.set_setting("theme", "amber")
+    assert db.get_setting("theme") == "amber"
+
+    db.delete_setting("theme")
+    assert db.get_setting("theme") is None
+
+

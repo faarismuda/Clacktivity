@@ -27,6 +27,11 @@ CREATE INDEX IF NOT EXISTS idx_key_events_date ON key_events(date_str);
 CREATE INDEX IF NOT EXISTS idx_key_events_date_key ON key_events(date_str, key_code);
 CREATE INDEX IF NOT EXISTS idx_key_events_date_app ON key_events(date_str, app_name);
 CREATE INDEX IF NOT EXISTS idx_key_events_timestamp ON key_events(timestamp DESC);
+
+CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 """
 
 
@@ -152,3 +157,30 @@ class Database:
             "offset": offset,
             "items": [dict(row) for row in rows],
         }
+
+    def get_setting(self, key: str, default: str | None = None) -> str | None:
+        """Return a configuration value from app_settings or default if not found."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT value FROM app_settings WHERE key = ?", (key,)
+            ).fetchone()
+        return str(row["value"]) if row is not None else default
+
+    def set_setting(self, key: str, value: str) -> None:
+        """Insert or update a configuration value in app_settings."""
+        with self._lock:
+            with self._connect() as conn:
+                conn.execute(
+                    "INSERT INTO app_settings (key, value) VALUES (?, ?) "
+                    "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                    (key, str(value)),
+                )
+                conn.commit()
+
+    def delete_setting(self, key: str) -> None:
+        """Delete a configuration key from app_settings if present."""
+        with self._lock:
+            with self._connect() as conn:
+                conn.execute("DELETE FROM app_settings WHERE key = ?", (key,))
+                conn.commit()
+

@@ -25,6 +25,8 @@
       <button type="button" id="btn-export-csv" class="btn">Export Raw CSV</button>
       <button type="button" id="btn-export-summary" class="btn">Export Daily Summary CSV</button>
       <button type="button" id="btn-export-json" class="btn">Export JSON</button>
+      <button type="button" id="btn-security" class="btn">Security</button>
+      <button type="button" id="btn-lock-now" class="btn" hidden>Lock Now</button>
     </div>
   </header>
 
@@ -195,6 +197,47 @@
       <div id="horizontal-events-stream" class="key-stream-box"></div>
     </section>
   </main>
+
+  <div id="lock-overlay" class="lock-overlay" hidden>
+    <div class="lock-card">
+      <div class="lock-icon">&#128274;</div>
+      <h2 class="lock-title">Clacktivity Locked</h2>
+      <p class="lock-desc">Enter your master password to unlock the dashboard.</p>
+      <form id="lock-form" class="lock-form">
+        <input type="password" id="lock-password-input" class="input-ctrl" placeholder="Master Password" required autocomplete="current-password" />
+        <div id="lock-error" class="form-error"></div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:10px;">Unlock</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="security-modal" class="modal-backdrop" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2 class="panel-title">Security Settings</h2>
+        <button type="button" id="btn-close-security" class="btn">&times;</button>
+      </div>
+      <form id="security-form" class="modal-body">
+        <div id="sec-current-password-group" class="form-field" hidden>
+          <label for="sec-current-password">Current Password</label>
+          <input type="password" id="sec-current-password" class="input-ctrl" autocomplete="current-password" />
+        </div>
+        <div class="form-field">
+          <label for="sec-new-password">New Master Password (min 4 chars)</label>
+          <input type="password" id="sec-new-password" class="input-ctrl" autocomplete="new-password" placeholder="Leave blank to keep unchanged" />
+        </div>
+        <div class="form-field">
+          <label for="sec-expiration-hours">Session Expiration (Hours, 1-720)</label>
+          <input type="number" id="sec-expiration-hours" class="input-ctrl" min="1" max="720" value="2" />
+        </div>
+        <div id="security-error" class="form-error"></div>
+        <div class="modal-actions">
+          <button type="button" id="btn-disable-password" class="btn btn-danger" hidden>Disable Password</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <script type="module" src="/static/js/app.js"></script>
 </body>
