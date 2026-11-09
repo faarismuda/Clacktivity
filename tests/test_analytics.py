@@ -59,11 +59,13 @@ def test_exporter_csv_and_json():
     csv_body, mime, fname = export_events(events, fmt="csv", mode="raw")
     assert "KeyA" in csv_body
     assert mime == "text/csv"
+    assert fname.startswith("clacktivity_")
     assert fname.endswith(".csv")
 
     json_body, jmime, jfname = export_events(events, fmt="json", mode="summary")
     assert "KeyA" in json_body
     assert jmime == "application/json"
+    assert jfname.startswith("clacktivity_")
     assert jfname.endswith(".json")
 
 

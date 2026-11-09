@@ -58,7 +58,7 @@ def export_events(
 
     if fmt_clean == "json":
         payload = json.dumps(rows, indent=2, ensure_ascii=False)
-        filename = f"keyboard_{mode_clean}_{label}.json"
+        filename = f"clacktivity_{mode_clean}_{label}.json"
         return payload, "application/json", filename
 
     buf = io.StringIO()
@@ -72,5 +72,5 @@ def export_events(
     for row in rows:
         writer.writerow(row)
 
-    filename = f"keyboard_{mode_clean}_{label}.csv"
+    filename = f"clacktivity_{mode_clean}_{label}.csv"
     return buf.getvalue(), "text/csv", filename
